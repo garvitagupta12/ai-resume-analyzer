@@ -60,7 +60,6 @@ Analysis results can be downloaded as structured JSON files:
 | PyMuPDF | PDF text extraction |
 | python-docx | DOCX text extraction |
 | python-dotenv | Environment variable management |
-| Sentence Transformers | Text embeddings and semantic similarity |
 
 ---
 
@@ -202,12 +201,6 @@ Through this project, I explored:
 - Handling file uploads
 - Managing session state
 - Creating tabs, buttons, expanders and custom UI components
-
-### 🧠 Embeddings & Semantic Similarity
-
-- Understanding text embeddings
-- Exploring Sentence Transformers
-- Understanding how semantic similarity can be used for resume and job matching
 
 ### 🛠️ Software Development
 
