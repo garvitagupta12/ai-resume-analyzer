@@ -1,0 +1,7 @@
+streamlit
+python-dotenv
+pymupdf
+python-docx
+langchain
+langchain-mistralai
+pydantic

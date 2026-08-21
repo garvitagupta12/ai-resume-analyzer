@@ -1,0 +1,22 @@
+We are looking for a Junior Data Analyst to join our team.
+
+Responsibilities:
+- Analyze business data and generate insights.
+- Create dashboards and reports.
+- Clean and preprocess datasets.
+- Write SQL queries to extract and analyze data.
+- Collaborate with different teams to understand business requirements.
+
+Requirements:
+- Bachelor's degree in Computer Science, Data Science, Statistics, or a related field.
+- Strong knowledge of Python and Pandas.
+- Good SQL skills.
+- Experience with data visualization tools such as Tableau or Power BI.
+- Understanding of statistics and exploratory data analysis.
+- Strong analytical and problem-solving skills.
+- Good communication skills.
+
+Preferred:
+- Knowledge of machine learning.
+- Experience with cloud platforms.
+- Familiarity with Git and GitHub.
