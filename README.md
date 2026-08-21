@@ -2,6 +2,8 @@
 
 > An AI-powered resume analysis and job matching application built with Python, Streamlit, LangChain, Mistral AI, and Pydantic.
 
+[![🚀 Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://ai-resume-analyzer-matcher.streamlit.app/)
+
 Dossier analyzes resumes and compares them against job descriptions using an LLM. It extracts structured information from resumes, identifies relevant skills and experience, and provides an AI-generated compatibility assessment.
 
 ---
