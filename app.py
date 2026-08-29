@@ -1,543 +1,415 @@
+"""
+ResumeIQ — AI Resume Analyzer & Job Match Scorer
+--------------------------------------------------
+A portfolio project by Garvita Gupta.
+
+Wires together parser.py, analyzer.py, and matcher.py (Mistral + LangChain +
+Pydantic structured outputs) into a polished, recruiter-friendly web app.
+"""
+
+import os
 import json
 import streamlit as st
-from analyzer import analyze_resume
-from matcher import match_resume_to_jd
-from parser import extract_text
+from dotenv import load_dotenv
 
-# =========================================================
-# Page Configuration
-# =========================================================
+load_dotenv()
 
+# ----------------------------------------------------------------------
+# Page config
+# ----------------------------------------------------------------------
 st.set_page_config(
-    page_title="Dossier — AI Resume Review",
-    page_icon="🗂️",
+    page_title="ResumeIQ | AI Resume Analyzer",
+    page_icon="🧠",
     layout="wide",
 )
 
-
-# =========================================================
-# Design system — fonts, tokens, component overrides
-# =========================================================
+# ----------------------------------------------------------------------
+# Brand palette + global styling
+# ----------------------------------------------------------------------
+NAVY = "#21295C"
+DEEPBLUE = "#065A82"
+TEAL = "#1C7293"
+ICE = "#CFE8F0"
+OFFWHITE = "#F6FAFB"
+MUTED = "#5B6B77"
 
 st.markdown(
-    """
+    f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-    :root {
-        /* Soft Pastel Palette */
-        --desk: #F5EFEB;         /* Soft Pastel Linen */
-        --desk-2: #E8DFD8;       /* Muted Warm Sand */
-        --line: rgba(74, 63, 53, 0.12);
-        --paper: #FFFFFF;        /* Pure White */
-        --paper-2: #FAF7F2;      /* Off-White Ivory */
-        --brass: #CBA358;        /* Soft Pastel Amber */
-        --brass-dim: #9E7B3B;    /* Muted Gold */
-        --sage: #8BB18A;         /* Soft Pastel Mint/Sage */
-        --sage-dark: #4F734E;    /* Readable Dark Mint */
-        --rust: #D98880;         /* Soft Pastel Coral/Terracotta */
-        --rust-dark: #A3483F;    /* Readable Dark Coral */
-        --ink: #362E2B;          /* Soft Charcoal Dark Brown */
-        --ink-soft: #7A6F6B;     /* Muted Charcoal Text */
-    }
-
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-
-    /* ---------- App shell ---------- */
-    [data-testid="stAppViewContainer"] {
-        background:
-            radial-gradient(1200px 500px at 15% -10%, rgba(203,163,88,0.12), transparent 60%),
-            var(--desk);
-    }
-    [data-testid="stHeader"] { background: transparent; }
-    .block-container { padding-top: 2rem; max-width: 1180px; }
-
-    h1, h2, h3 { font-family: 'Fraunces', serif; letter-spacing: -0.01em; color: var(--ink); }
-
-    /* ---------- Sidebar: the "folder spine" panel ---------- */
-    [data-testid="stSidebar"] {
-        background: var(--desk-2);
-        border-right: 1px solid var(--line);
-    }
-    [data-testid="stSidebar"] * { color: var(--ink); }
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 {
-        font-family: 'Fraunces', serif;
-    }
-    [data-testid="stSidebar"] hr { border-color: var(--line); }
-
-    /* Sidebar labels -> typewritten field tags */
-    [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stMarkdown p {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.72rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--ink-soft) !important;
-    }
-
-    /* ---------- Buttons ---------- */
-    .stButton > button {
-        width: 100%;
-        background: var(--paper);
-        color: var(--brass-dim) !important;
-        border: 1px solid var(--brass);
-        border-radius: 6px;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.78rem;
-        letter-spacing: 0.10em;
-        text-transform: uppercase;
-        padding: 0.6rem 1rem;
-        transition: all 0.15s ease;
-    }
-    .stButton > button:hover {
-        background: var(--brass-dim);
-        color: var(--paper) !important;
-        border-color: var(--brass-dim);
-    }
-    .stButton > button:disabled {
-        color: #C2B8B2 !important;
-        border-color: #DDD4CE;
-        background: transparent;
-    }
-
-    /* ---------- File uploader ---------- */
-    [data-testid="stFileUploaderDropzone"] {
-        background: rgba(255, 255, 255, 0.4);
-        border: 1px dashed var(--line);
-        border-radius: 6px;
-    }
-
-    /* ---------- Tabs styled as folder tabs ---------- */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 4px;
-        border-bottom: 1px solid var(--brass-dim);
-        background: transparent;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background: var(--desk-2);
-        border: 1px solid var(--line);
-        border-bottom: none;
-        border-radius: 8px 8px 0 0;
-        color: var(--ink-soft);
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.78rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        padding: 10px 22px;
-    }
-    .stTabs [aria-selected="true"] {
-        background: var(--paper-2) !important;
-        color: var(--ink) !important;
-        border-color: var(--paper-2) !important;
-        font-weight: 600;
-    }
-    .stTabs [data-baseweb="tab-panel"] {
-        background: var(--paper-2);
-        border-radius: 0 10px 10px 10px;
-        padding: 30px 34px 24px 34px;
-        border: 1px solid var(--line);
-        border-top: none;
-    }
-    .stTabs [data-baseweb="tab-panel"] * { color: var(--ink); }
-    .stTabs [data-baseweb="tab-panel"] h3, .stTabs [data-baseweb="tab-panel"] h4 {
-        font-family: 'Fraunces', serif;
-        color: var(--ink);
-    }
-
-    /* ---------- Paper card: a document with a folded corner ---------- */
-    .paper {
-        position: relative;
-        background: var(--paper);
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 18px 20px 16px 20px;
-        margin-bottom: 18px;
-        box-shadow: 0 4px 12px rgba(54, 46, 43, 0.04);
-    }
-    .paper::after {
-        content: "";
-        position: absolute;
-        top: 0; right: 0;
-        width: 0; height: 0;
-        border-style: solid;
-        border-width: 0 16px 16px 0;
-        border-color: transparent var(--paper-2) transparent transparent;
-        filter: drop-shadow(-1px 1px 1px rgba(54, 46, 43, 0.08));
-    }
-    .paper-label {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.68rem;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: var(--brass-dim);
-        margin-bottom: 8px;
-        display: block;
-    }
-    .paper li, .paper p { color: var(--ink); }
-
-    /* ---------- Tags (skills, matches, misses) ---------- */
-    .tag {
-        display: inline-block;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.74rem;
-        letter-spacing: 0.03em;
-        padding: 3px 10px;
-        margin: 3px 4px 3px 0;
-        border-radius: 4px;
-        border: 1px solid;
-    }
-    .tag-brass { color: var(--brass-dim); border-color: var(--brass); background: #FAF3E6; }
-    .tag-sage  { color: var(--sage-dark); border-color: var(--sage); background: #EEF5EE; }
-    .tag-rust  { color: var(--rust-dark); border-color: var(--rust); background: #FDF2F0; }
-
-    /* ---------- Hero ---------- */
-    .hero-eyebrow {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.72rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--brass-dim);
-        margin-bottom: 6px;
-    }
-    .hero-title {
-        font-family: 'Fraunces', serif;
-        font-size: 2.6rem;
-        font-weight: 600;
-        color: var(--ink);
-        line-height: 1.08;
-        margin: 0 0 10px 0;
-    }
-    .hero-sub {
+    html, body, [class*="css"] {{
         font-family: 'Inter', sans-serif;
-        color: var(--ink-soft);
-        font-size: 1.02rem;
-        max-width: 620px;
-        margin-bottom: 6px;
-    }
-    .hero-rule { border: none; border-top: 1px solid var(--line); margin: 22px 0 28px 0; }
+    }}
 
-    /* ---------- Seal badge for match score ---------- */
-    .seal-wrap { display: flex; align-items: center; gap: 28px; }
-    .seal {
-        flex-shrink: 0;
-        width: 128px; height: 128px;
-        border-radius: 50%;
-        border: 3px double var(--seal-color, var(--brass-dim));
-        display: flex; flex-direction: column;
-        align-items: center; justify-content: center;
-        transform: rotate(-6deg);
-        background: rgba(203, 163, 88, 0.08);
-    }
-    .seal-score {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 2.1rem;
-        font-weight: 600;
-        color: var(--seal-color, var(--brass-dim));
-        line-height: 1;
-    }
-    .seal-caption {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.62rem;
-        letter-spacing: 0.14em;
-        color: var(--seal-color, var(--brass-dim));
-        margin-top: 4px;
-    }
-    .seal-verdict {
-        font-family: 'Fraunces', serif;
-        font-size: 1.3rem;
-        color: var(--ink);
-        margin-bottom: 6px;
-    }
+    .stApp {{ background: {OFFWHITE}; }}
+    .block-container {{ padding-top: 1.5rem; padding-bottom: 2rem; max-width: 1180px; }}
 
-    /* ---------- Candidate name plate ---------- */
-    .nameplate {
-        font-family: 'Fraunces', serif;
-        font-size: 1.9rem;
-        color: var(--ink);
-        margin: 4px 0 2px 0;
-    }
-    .nameplate-eyebrow {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.68rem;
-        letter-spacing: 0.16em;
-        text-transform: uppercase;
-        color: var(--brass-dim);
-    }
+    /* Hero */
+    .hero {{
+        background: linear-gradient(135deg, {NAVY} 0%, {DEEPBLUE} 100%);
+        border-radius: 18px;
+        padding: 2.6rem 2.8rem;
+        color: white;
+        margin-bottom: 1.6rem;
+        box-shadow: 0 10px 30px -12px rgba(33, 41, 92, 0.45);
+        position: relative;
+        overflow: hidden;
+    }}
+    .hero::after {{
+        content: "";
+        position: absolute; top: -60px; right: -60px;
+        width: 220px; height: 220px; border-radius: 50%;
+        background: rgba(255,255,255,0.06);
+    }}
+    .hero h1 {{ font-size: 2.1rem; font-weight: 800; margin: 0 0 0.4rem 0; position: relative; }}
+    .hero p {{ font-size: 1.02rem; color: {ICE}; margin: 0; max-width: 640px; line-height: 1.5; position: relative; }}
+    .hero-badge {{
+        display:inline-block; background: rgba(255,255,255,0.14); color: {ICE};
+        padding: 4px 14px; border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+        letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 0.9rem; position: relative;
+    }}
 
-    [data-testid="stExpander"] {
-        background: var(--paper);
-        border: 1px solid var(--line);
-        border-radius: 6px;
-    }
-    [data-testid="stExpander"] summary { color: var(--ink); }
+    /* Feature cards */
+    .feat-card {{
+        background: white; border: 1px solid #E3ECEF; border-radius: 14px;
+        padding: 1.3rem 1.4rem; height: 100%;
+        box-shadow: 0 2px 10px -4px rgba(20, 40, 70, 0.08);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }}
+    .feat-card:hover {{
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px -8px rgba(20, 40, 70, 0.18);
+    }}
+    .feat-icon {{ font-size: 1.6rem; margin-bottom: 0.55rem; }}
+    .feat-title {{ font-weight: 700; color: {NAVY}; font-size: 1.02rem; margin-bottom: 0.35rem; }}
+    .feat-desc {{ color: {MUTED}; font-size: 0.87rem; line-height: 1.45; }}
+
+    /* Section labels */
+    .section-label {{
+        font-size: 0.76rem; font-weight: 700; letter-spacing: 0.07em;
+        color: {TEAL}; text-transform: uppercase; margin: 0.2rem 0 0.6rem 0;
+    }}
+
+    /* Pills */
+    .pill {{
+        display: inline-block; padding: 5px 14px; margin: 4px 6px 4px 0;
+        border-radius: 999px; font-size: 0.83rem; font-weight: 600;
+    }}
+    .pill-neutral {{ background: {ICE}; color: {NAVY}; }}
+    .pill-good    {{ background: #DFF5E3; color: #1B6B3A; }}
+    .pill-bad     {{ background: #FBE3E3; color: #A32020; }}
+
+    /* Fit badge under score gauge */
+    .fit-badge {{
+        display:block; text-align:center; margin: 0.7rem auto 0 auto; width: fit-content;
+        padding: 5px 16px; border-radius: 999px; font-size: 0.8rem; font-weight: 700;
+    }}
+
+    /* Streamlit containers used as result cards */
+    div[data-testid="stVerticalBlockBorderWrapper"] {{
+        background: white; border-radius: 14px !important;
+        box-shadow: 0 2px 10px -4px rgba(20, 40, 70, 0.07);
+    }}
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {{ gap: 6px; border-bottom: 1px solid #E3ECEF; }}
+    .stTabs [data-baseweb="tab"] {{
+        height: 46px; padding: 0 20px; background-color: transparent;
+        border-radius: 10px 10px 0 0; font-weight: 600; color: {MUTED};
+    }}
+    .stTabs [aria-selected="true"] {{
+        background-color: white; color: {NAVY} !important;
+        box-shadow: 0 -2px 0 0 {DEEPBLUE} inset;
+    }}
+    .stTabs [data-baseweb="tab-highlight"] {{ background-color: {DEEPBLUE} !important; }}
+
+    /* File uploader */
+    div[data-testid="stFileUploaderDropzone"] {{
+        background: white; border: 1.5px dashed #B9CFD9; border-radius: 12px;
+    }}
+
+    /* Divider */
+    hr {{ border: none; border-top: 1px solid #E3ECEF; margin: 1.4rem 0; }}
+
+    /* Footer */
+    .app-footer {{
+        text-align: center; color: {MUTED}; font-size: 0.82rem;
+        padding: 1.4rem 0 0.6rem 0; border-top: 1px solid #E3ECEF; margin-top: 2rem;
+    }}
+    .app-footer a {{ color: {TEAL}; text-decoration: none; font-weight: 600; }}
+
+    div.stButton > button {{
+        background: {DEEPBLUE}; color: white; border: none; border-radius: 8px;
+        font-weight: 600; padding: 0.55rem 1.4rem; transition: background 0.15s ease;
+    }}
+    div.stButton > button:hover {{ background: {NAVY}; color: white; }}
+    div.stButton > button:disabled {{ background: #C7D3D8; color: white; }}
+
+    div[data-testid="stDownloadButton"] > button {{
+        background: white; color: {DEEPBLUE}; border: 1.5px solid {DEEPBLUE};
+        border-radius: 8px; font-weight: 600;
+    }}
+    div[data-testid="stDownloadButton"] > button:hover {{
+        background: {DEEPBLUE}; color: white;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# =========================================================
-# Session State
-# =========================================================
-
-defaults = {
-    "resume_text": None,
-    "resume_name": None,
-    "analysis": None,
-    "match_result": None,
-}
-for key, value in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = value
-
-
-def tags(items, css_class="tag-brass", empty_label="None identified"):
+def render_pills(items, style="neutral"):
     if not items:
-        st.caption(empty_label)
+        st.caption("None found.")
         return
-    html = "".join(f'<span class="tag {css_class}">{i}</span>' for i in items)
+    html = "".join(f'<span class="pill pill-{style}">{i}</span>' for i in items)
     st.markdown(html, unsafe_allow_html=True)
 
 
-def paper_list(label, items, empty_label="None identified"):
-    st.markdown('<div class="paper">', unsafe_allow_html=True)
-    st.markdown(f'<span class="paper-label">{label}</span>', unsafe_allow_html=True)
-    if items:
-        st.markdown(
-            "".join(f"<li>{i}</li>" for i in items),
-            unsafe_allow_html=True,
-        )
-    else:
-        st.caption(empty_label)
-    st.markdown("</div>", unsafe_allow_html=True)
+def render_bullets(items):
+    if not items:
+        st.caption("None found.")
+        return
+    for item in items:
+        st.markdown(f"- {item}")
 
 
-def seal_color(score):
+def score_palette(score):
     if score >= 75:
-        return "#4F734E"  # pastel mint/sage
+        return "#1B6B3A", "#22A559"   # text, gauge fill (green)
     if score >= 50:
-        return "#9E7B3B"  # pastel amber/gold
-    return "#A3483F"  # pastel coral/rust
+        return "#8A5A00", "#E9A227"   # amber
+    return "#A32020", "#E5484D"       # red
 
 
-def verdict_text(score):
+def fit_label(score):
     if score >= 75:
-        return "Strong Fit"
+        return "Strong Fit", "#1B6B3A", "#DFF5E3"
     if score >= 50:
-        return "Worth a Conversation"
-    return "Significant Gaps"
+        return "Moderate Fit", "#8A5A00", "#FCEFD6"
+    return "Needs Improvement", "#A32020", "#FBE3E3"
 
 
-# =========================================================
-# Sidebar — the control panel
-# =========================================================
-
-with st.sidebar:
+def score_gauge(score):
+    text_color, fill = score_palette(score)
+    pct = max(0, min(100, score))
+    label, label_color, label_bg = fit_label(score)
     st.markdown(
-        "<div class='hero-eyebrow' style='margin-top:-6px;'>DOSSIER</div>"
-        "<div style='font-family:Fraunces,serif;font-size:1.3rem;color:#362E2B;margin-bottom:4px;'>Review Desk</div>",
+        f"""
+        <div style="display:flex; justify-content:center; margin: 0.4rem 0 0.2rem 0;">
+          <div style="width:160px;height:160px;border-radius:50%;
+                      background: conic-gradient({fill} {pct}%, #EAF2F5 0);
+                      display:flex;align-items:center;justify-content:center;">
+            <div style="width:122px;height:122px;border-radius:50%;background:white;
+                        display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:2.1rem;font-weight:800;color:{text_color};line-height:1;">{score}</span>
+              <span style="font-size:0.72rem;color:{MUTED};margin-top:2px;">/ 100 match</span>
+            </div>
+          </div>
+        </div>
+        <div class="fit-badge" style="color:{label_color};background:{label_bg};">{label}</div>
+        """,
         unsafe_allow_html=True,
     )
-    st.caption("Case intake")
-
-    st.divider()
-    st.markdown("**Exhibit A — Resume**")
-
-    uploaded_file = st.file_uploader(
-        "Upload resume", type=["pdf", "docx"], label_visibility="collapsed"
-    )
-
-    if (
-        uploaded_file is not None
-        and uploaded_file.name != st.session_state.resume_name
-    ):
-        with st.spinner("Extracting text..."):
-            st.session_state.resume_text = extract_text(uploaded_file)
-        st.session_state.resume_name = uploaded_file.name
-        st.session_state.analysis = None
-        st.session_state.match_result = None
-
-    if st.session_state.resume_text:
-        st.markdown(
-            f"<span style='color:#4F734E;font-family:IBM Plex Mono,monospace;font-size:0.75rem;'>"
-            f"✓ ON FILE — {st.session_state.resume_name}</span>",
-            unsafe_allow_html=True,
-        )
-
-    st.divider()
-    st.markdown("**Exhibit B — Job Description**")
-
-    jd_text = st.text_area(
-        "Paste job description",
-        height=200,
-        placeholder="Paste the job description here...",
-        label_visibility="collapsed",
-    )
-
-    st.divider()
-    analyze_clicked = st.button(
-        "Analyze Resume",
-        use_container_width=True,
-        disabled=st.session_state.resume_text is None,
-    )
-    match_clicked = st.button(
-        "Check Job Match",
-        use_container_width=True,
-        disabled=not (st.session_state.resume_text and jd_text.strip()),
-    )
 
 
-# =========================================================
-# Trigger Actions
-# =========================================================
+key_present = bool(os.environ.get("MISTRAL_API_KEY"))
+if not key_present:
+    st.error("MISTRAL_API_KEY is not set. Add it to your .env file to run this app.")
+    st.stop()
 
-if analyze_clicked:
-    with st.spinner("Reviewing the resume..."):
-        st.session_state.analysis = analyze_resume(
-            st.session_state.resume_text
-        )
+# Imports deferred until the API key is set, since ChatMistralAI is
+# instantiated at module import time in analyzer.py / matcher.py.
+from parser import extract_text
+from analyzer import analyze_resume
+from matcher import match_resume_to_jd
 
-if match_clicked:
-    with st.spinner("Weighing the resume against the job description..."):
-        st.session_state.match_result = match_resume_to_jd(
-            st.session_state.resume_text, jd_text
-        )
-
-
-# =========================================================
+# ----------------------------------------------------------------------
 # Hero
-# =========================================================
-
+# ----------------------------------------------------------------------
 st.markdown(
     """
-    <div class="hero-eyebrow">Candidate Review · AI-Assisted</div>
-    <div class="hero-title">Every resume,<br>reviewed properly.</div>
-    <div class="hero-sub">Upload a resume to open the file. Add a job description to weigh it against
-    a real role. Nothing here is invented — only what's actually on the page.</div>
-    <hr class="hero-rule">
+    <div class="hero">
+        <div class="hero-badge">AI-Powered · Structured Output</div>
+        <h1>ResumeIQ — Resume Analyzer & Job Match Scorer</h1>
+        <p>Extract structured insights from any resume, or score it against a job
+        description to see exactly where a candidate fits — and where they don't —
+        in seconds, not minutes.</p>
+    </div>
     """,
     unsafe_allow_html=True,
 )
 
-if st.session_state.resume_text is None:
-    st.info("No case open. Upload a resume from the panel on the left to begin.")
-else:
-    with st.expander("View extracted resume text"):
-        st.text_area(
-            "Resume Content",
-            st.session_state.resume_text,
-            height=250,
-            label_visibility="collapsed",
-        )
+tab_overview, tab_analyze, tab_match = st.tabs(
+    ["🏠 Overview", "🔍 Analyze Resume", "🎯 Match to Job Description"]
+)
 
-tab_analysis, tab_match = st.tabs(["ANALYSIS", "JOB MATCH"])
-
-
-# ---------------------------------------------------------
-# Tab 1 — Resume Analysis
-# ---------------------------------------------------------
-
-with tab_analysis:
-    analysis = st.session_state.analysis
-
-    if analysis is None:
-        st.caption(
-            "Run **Analyze Resume** from the panel on the left to open this file."
-        )
-    else:
-        st.markdown(
-            f"<div class='nameplate-eyebrow'>Candidate</div>"
-            f"<div class='nameplate'>{analysis.candidate_name}</div>",
-            unsafe_allow_html=True,
-        )
-        st.write("")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown('<div class="paper">', unsafe_allow_html=True)
+# ----------------------------------------------------------------------
+# TAB — Overview
+# ----------------------------------------------------------------------
+with tab_overview:
+    c1, c2, c3 = st.columns(3)
+    features = [
+        ("📄", "Structured Extraction", "Pulls candidate name, skills, education, experience, projects, and certifications into clean, structured fields — not a wall of text."),
+        ("🎯", "Job Match Scoring", "Compares a resume against any job description and returns a 0–100 match score with matched and missing skills."),
+        ("💡", "Actionable Feedback", "Surfaces candidate strengths and concrete areas for improvement, with a plain-English explanation behind every score."),
+    ]
+    for col, (icon, title, desc) in zip([c1, c2, c3], features):
+        with col:
             st.markdown(
-                '<span class="paper-label">Skills</span>',
+                f"""
+                <div class="feat-card">
+                    <div class="feat-icon">{icon}</div>
+                    <div class="feat-title">{title}</div>
+                    <div class="feat-desc">{desc}</div>
+                </div>
+                """,
                 unsafe_allow_html=True,
             )
-            tags(analysis.skills, "tag-brass")
-            st.markdown("</div>", unsafe_allow_html=True)
 
-            paper_list("Education", analysis.education)
-            paper_list("Certifications", analysis.certifications)
+# ----------------------------------------------------------------------
+# TAB — Analyze Resume
+# ----------------------------------------------------------------------
+with tab_analyze:
+    resume_file = st.file_uploader(
+        "Upload resume (PDF or DOCX)", type=["pdf", "docx"], key="analyze_upload"
+    )
 
-        with col2:
-            paper_list("Experience", analysis.experience)
-            paper_list("Projects", analysis.projects)
+    if st.button("Analyze Resume", type="primary", disabled=resume_file is None):
+        try:
+            with st.spinner("Reading resume..."):
+                resume_text = extract_text(resume_file)
+            if not resume_text.strip():
+                st.error("Couldn't extract any text from this file. Try a different file.")
+            else:
+                with st.spinner("Analyzing with AI..."):
+                    result = analyze_resume(resume_text)
+                st.session_state["analysis_result"] = result
+        except Exception as e:
+            st.error("Something went wrong while analyzing this resume.")
+            with st.expander("Show technical details"):
+                st.code(str(e))
+
+    result = st.session_state.get("analysis_result")
+    if result:
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.container(border=True):
+            st.markdown(f"## {result.candidate_name}")
+
+            st.markdown('<div class="section-label">🛠️ Skills</div>', unsafe_allow_html=True)
+            render_pills(result.skills, "neutral")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<div class="section-label">🎓 Education</div>', unsafe_allow_html=True)
+                render_bullets(result.education)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-label">📜 Certifications</div>', unsafe_allow_html=True)
+                render_bullets(result.certifications)
+            with col2:
+                st.markdown('<div class="section-label">💼 Experience</div>', unsafe_allow_html=True)
+                render_bullets(result.experience)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-label">🚀 Projects</div>', unsafe_allow_html=True)
+                render_bullets(result.projects)
+
+            st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(
-                "⬇️ Download Analysis",
-                data=analysis.model_dump_json(indent=4),
-                file_name="resume_analysis.json",
+                "⬇️ Download as JSON",
+                data=json.dumps(result.model_dump(), indent=2),
+                file_name=f"{result.candidate_name.replace(' ', '_')}_analysis.json",
                 mime="application/json",
             )
 
-
-# ---------------------------------------------------------
-# Tab 2 — Job Match
-# ---------------------------------------------------------
-
+# ----------------------------------------------------------------------
+# TAB — Match to Job Description
+# ----------------------------------------------------------------------
 with tab_match:
-    match_result = st.session_state.match_result
-
-    if match_result is None:
-        st.caption(
-            "Paste a job description on the left and run **Check Job Match** to open this file."
+    col_left, col_right = st.columns(2)
+    with col_left:
+        match_resume_file = st.file_uploader(
+            "Upload resume (PDF or DOCX)", type=["pdf", "docx"], key="match_upload"
         )
-    else:
-        score = match_result.match_score
-        color = seal_color(score)
-
-        st.markdown('<div class="paper">', unsafe_allow_html=True)
-        st.markdown(
-            f"""
-            <div class="seal-wrap">
-                <div class="seal" style="--seal-color:{color};">
-                    <div class="seal-score">{score}</div>
-                    <div class="seal-caption">/ 100</div>
-                </div>
-                <div>
-                    <div class="seal-verdict">{verdict_text(score)}</div>
-                    <p style="margin:0;">{match_result.explanation}</p>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    with col_right:
+        jd_text = st.text_area(
+            "Paste the job description",
+            height=200,
+            placeholder="Paste the full job description here...",
         )
-        st.markdown("</div>", unsafe_allow_html=True)
 
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown('<div class="paper">', unsafe_allow_html=True)
-            st.markdown(
-                '<span class="paper-label">Matching Skills</span>',
-                unsafe_allow_html=True,
-            )
-            tags(match_result.matching_skills, "tag-sage")
-            st.markdown("</div>", unsafe_allow_html=True)
+    match_ready = match_resume_file is not None and bool(jd_text.strip())
+    if st.button("Match Resume to Job", type="primary", disabled=not match_ready):
+        try:
+            with st.spinner("Reading resume..."):
+                resume_text = extract_text(match_resume_file)
+            if not resume_text.strip():
+                st.error("Couldn't extract any text from this file. Try a different file.")
+            else:
+                with st.spinner("Comparing resume to job description..."):
+                    match_result = match_resume_to_jd(resume_text, jd_text)
+                st.session_state["match_result"] = match_result
+        except Exception as e:
+            st.error("Something went wrong while matching this resume.")
+            with st.expander("Show technical details"):
+                st.code(str(e))
 
-            paper_list("Relevant Experience", match_result.relevant_experience)
-            paper_list("Strengths", match_result.strengths)
+    match_result = st.session_state.get("match_result")
+    if match_result:
+        st.markdown("<br>", unsafe_allow_html=True)
+        score = max(0, min(100, match_result.match_score))
 
-        with col2:
-            st.markdown('<div class="paper">', unsafe_allow_html=True)
-            st.markdown(
-                '<span class="paper-label">Missing Skills</span>',
-                unsafe_allow_html=True,
-            )
-            tags(match_result.missing_skills, "tag-rust")
-            st.markdown("</div>", unsafe_allow_html=True)
+        with st.container(border=True):
+            score_col, exp_col = st.columns([1, 2])
+            with score_col:
+                score_gauge(score)
+            with exp_col:
+                st.markdown('<div class="section-label">Explanation</div>', unsafe_allow_html=True)
+                st.write(match_result.explanation)
 
-            paper_list("Relevant Projects", match_result.relevant_projects)
-            paper_list(
-                "Areas for Improvement", match_result.areas_for_improvement
-            )
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown('<div class="section-label">✅ Matching Skills</div>', unsafe_allow_html=True)
+                render_pills(match_result.matching_skills, "good")
+            with col2:
+                st.markdown('<div class="section-label">❌ Missing Skills</div>', unsafe_allow_html=True)
+                render_pills(match_result.missing_skills, "bad")
+
+            st.markdown("---")
+            col3, col4 = st.columns(2)
+            with col3:
+                st.markdown('<div class="section-label">Relevant Experience</div>', unsafe_allow_html=True)
+                render_bullets(match_result.relevant_experience)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-label">Relevant Projects</div>', unsafe_allow_html=True)
+                render_bullets(match_result.relevant_projects)
+            with col4:
+                st.markdown('<div class="section-label">💪 Strengths</div>', unsafe_allow_html=True)
+                render_bullets(match_result.strengths)
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<div class="section-label">📈 Areas for Improvement</div>', unsafe_allow_html=True)
+                render_bullets(match_result.areas_for_improvement)
+
+            st.markdown("<br>", unsafe_allow_html=True)
             st.download_button(
-                "⬇️ Download Match Report",
-                data=match_result.model_dump_json(indent=4),
-                file_name="resume_match_report.json",
+                "⬇️ Download as JSON",
+                data=json.dumps(match_result.model_dump(), indent=2),
+                file_name="job_match_result.json",
                 mime="application/json",
             )
+
+# ----------------------------------------------------------------------
+# Footer
+# ----------------------------------------------------------------------
+st.markdown(
+    """
+    <div class="app-footer">
+        Built by <b>Garvita Gupta</b> ·
+        <a href="https://github.com/garvitagupta12" target="_blank">GitHub</a> ·
+        <a href="https://www.linkedin.com/in/garvita-gupta-0b635529a/" target="_blank">LinkedIn</a>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
