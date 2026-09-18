@@ -1,14 +1,21 @@
+import os
+
 from dotenv import load_dotenv
 from langchain_mistralai import ChatMistralAI
 from models import ResumeMatch
+
 load_dotenv()
 
+api_key = os.getenv("MISTRAL_API_KEY")
+
 llm = ChatMistralAI(
-    model="mistral-small-2506",
-    temperature=0
+    model="mistral-small-2603",
+    temperature=0,
+    api_key=api_key,
 )
 
 structured_llm = llm.with_structured_output(ResumeMatch)
+
 
 def match_resume_to_jd(resume_text, jd_text):
 
