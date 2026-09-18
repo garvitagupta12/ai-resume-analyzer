@@ -18,7 +18,7 @@ print("MISTRAL KEY PREFIX:", api_key[:8] if api_key else None)
 
 # Initialize Mistral LLM
 llm = ChatMistralAI(
-    model="mistral-small-2506",
+    model="mistral-small-2603",
     temperature=0,
     api_key=api_key,
 )
