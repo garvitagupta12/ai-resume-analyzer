@@ -1,7 +1,8 @@
 streamlit
-python-dotenv
-pymupdf
-python-docx
 langchain
-langchain-mistralai
-pydantic
+langchain-groq
+langgraph
+python-dotenv
+pypdf
+python-docx
+pymupdf
