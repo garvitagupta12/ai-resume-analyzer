@@ -12,6 +12,8 @@ load_dotenv()
 
 # Get Mistral API key
 api_key = os.getenv("MISTRAL_API_KEY")
+print("MISTRAL KEY EXISTS:", bool(api_key))
+print("MISTRAL KEY PREFIX:", api_key[:8] if api_key else None)
 
 
 # Initialize Mistral LLM
