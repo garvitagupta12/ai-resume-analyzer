@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
+from langchain_groq import ChatGroq
 
 from models import ResumeAnalysis
 
@@ -10,15 +10,13 @@ from models import ResumeAnalysis
 load_dotenv()
 
 
-# Get Mistral API key
-api_key = os.getenv("MISTRAL_API_KEY")
-print("MISTRAL KEY EXISTS:", bool(api_key))
-print("MISTRAL KEY PREFIX:", api_key[:8] if api_key else None)
+# Get Groq API key
+api_key = os.getenv("GROQ_API_KEY")
 
 
-# Initialize Mistral LLM
-llm = ChatMistralAI(
-    model="mistral-small-2603",
+# Initialize Groq LLM
+llm = ChatGroq(
+    model="openai/gpt-oss-20b",
     temperature=0,
     api_key=api_key,
 )
@@ -29,6 +27,7 @@ structured_llm = llm.with_structured_output(ResumeAnalysis)
 
 
 def analyze_resume(resume_text):
+
     prompt = f"""
 You are a very experienced resume analyzer.
 
