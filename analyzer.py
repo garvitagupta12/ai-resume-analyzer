@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+from langchain_mistralai import ChatMistralAI
 
 from models import ResumeAnalysis
 
@@ -11,7 +11,7 @@ load_dotenv()
 
 
 # Get Groq API key
-api_key = os.getenv("GROQ_API_KEY")
+api_key = os.getenv("MISTRAL_API_KEY")
 
 
 # Initialize Groq LLM
