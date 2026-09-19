@@ -10,13 +10,13 @@ from models import ResumeAnalysis
 load_dotenv()
 
 
-# Get Groq API key
+# Get Mistral API key
 api_key = os.getenv("MISTRAL_API_KEY")
 
 
-# Initialize Groq LLM
-llm = ChatGroq(
-    model="openai/gpt-oss-20b",
+# Initialize Mistral LLM
+llm = ChatMistralAI(
+    model="mistral-small-2506",
     temperature=0,
     api_key=api_key,
 )
@@ -27,7 +27,6 @@ structured_llm = llm.with_structured_output(ResumeAnalysis)
 
 
 def analyze_resume(resume_text):
-
     prompt = f"""
 You are a very experienced resume analyzer.
 
